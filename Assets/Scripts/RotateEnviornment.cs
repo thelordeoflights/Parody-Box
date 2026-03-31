@@ -1,13 +1,7 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
-/// <summary>
-/// Detects surfaces in four directions and lets the player change gravity toward them.
-/// 
-/// Controls (default):
-///   Arrow keys  — preview a surface in that direction
-///   Enter       — confirm and apply gravity change
-/// </summary>
 public class RotateEnvironment : MonoBehaviour
 {
     [Header("References")]
@@ -40,6 +34,10 @@ public class RotateEnvironment : MonoBehaviour
     private Vector3   _pendingGravityDirection;
     private bool      _isTransitioning;
 
+    [SerializeField] PlayerInput playerInput;
+    InputAction HologramUP, HologramDOWN, HologramLEFT, HologramRIGHT, ChangeGravity;
+
+
     // ── Unity lifecycle ───────────────────────────────────────────────────────
 
     private void Start()
@@ -48,42 +46,47 @@ public class RotateEnvironment : MonoBehaviour
             player = gameObject; // assume script is on the player
 
         hologramHandler.setActive(false);
+        SetActions();
     }
+
+
+    void SetActions()
+    {
+
+        HologramUP = playerInput.actions["HologramUP"];
+        HologramDOWN = playerInput.actions["HologramDOWN"];
+        HologramLEFT = playerInput.actions["HologramLEFT"];
+        HologramRIGHT = playerInput.actions["HologramRIGHT"];
+        ChangeGravity = playerInput.actions["ChangeGravity"];
+    }
+
+
 
     private void Update()
     {
         if (_isTransitioning) return;
-
+        
+        if(GameManager.instance.isGameOver) return;
+        
         // Confirm selection
-        if (Input.GetKeyDown(KeyCode.Return) && _hasSelection)
+        if (ChangeGravity.IsPressed() && _hasSelection)
         {
             StartCoroutine(ApplyGravityChange());
             return;
         }
 
-        // ── Arrow keys → cast in four directions relative to current gravity plane ──
-        // Left / Right : player's local left/right (projected onto current gravity plane)
-        // Up arrow     : player's local forward (projected onto current gravity plane)
-        // Down arrow   : opposite of player's forward (behind the player)
-        //
-        // Tip: gravity direction itself (straight down) can be selected by simply jumping —
-        // the ground is always in that direction.
-
-        if (Input.GetKeyDown(KeyCode.LeftArrow))
+        if (HologramLEFT.IsPressed())
             TrySelect(-transform.right);
 
-        else if (Input.GetKeyDown(KeyCode.RightArrow))
+        else if (HologramRIGHT.IsPressed())
             TrySelect(transform.right);
 
-        else if (Input.GetKeyDown(KeyCode.UpArrow))
+        else if (HologramUP.IsPressed())
             TrySelect(transform.forward);
 
-        else if (Input.GetKeyDown(KeyCode.DownArrow))
+        else if (HologramDOWN.IsPressed())
             TrySelect(-transform.forward);
 
-        // Optional: also let the player scan directly above (current ceiling)
-        else if (Input.GetKeyDown(KeyCode.Space) && Input.GetKey(KeyCode.LeftShift))
-            TrySelect(GravityManager.Instance.UpDirection); // toward current ceiling
     }
 
     // ── Surface detection ─────────────────────────────────────────────────────
@@ -136,9 +139,6 @@ public class RotateEnvironment : MonoBehaviour
         {
             Vector3 landPosition = _currentHit.point + _currentHit.normal * playerStandHeight;
             player.transform.position = landPosition;
-
-            // ❌ REMOVE this line — it was fighting GravityManager's slerp
-            // player.transform.up = _currentHit.normal;  
         }
 
         ClearSelection();

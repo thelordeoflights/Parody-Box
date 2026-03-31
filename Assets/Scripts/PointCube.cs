@@ -8,7 +8,7 @@ public class PointCube : MonoBehaviour
     {
         if(other.CompareTag("Player"))
         {
-            GameManager.instance.score += 1;
+            GameManager.instance.GameWin();
             Destroy(gameObject);
         }
     }
