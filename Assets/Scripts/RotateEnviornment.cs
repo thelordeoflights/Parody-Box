@@ -2,124 +2,118 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
+[AddComponentMenu("Gravity/Rotate Environment")]
 public class RotateEnvironment : MonoBehaviour
 {
     [Header("References")]
-    [Tooltip("The player GameObject (with ThirdPersonController)")]
-    public GameObject player;
+    [SerializeField] private GameObject player;
+    [SerializeField] private Transform castPoint;
+    [SerializeField] private HologramHandler hologramHandler;
+    [SerializeField] private PlayerInput playerInput;
 
-    [Tooltip("Origin of the surface-detection raycasts")]
-    public Transform castPoint;
+    [Header("Detection Settings")]
+    [SerializeField] private LayerMask wallMask;
+    [SerializeField] private float castDistance = 20f;
 
-    [Tooltip("HologramHandler for showing the target surface preview")]
-    public HologramHandler hologramHandler;
+    [Header("Teleport Settings")]
+    [SerializeField] private float playerStandHeight = 1.0f;
+    [SerializeField] private float transitionLockTime = 0.6f;
 
-    [Header("Detection")]
-    [Tooltip("Layer(s) that count as selectable surfaces (your 'wall' layer)")]
-    public LayerMask wallMask;
-
-    [Tooltip("Max distance to scan for surfaces")]
-    public float castDistance = 20f;
-
-    [Header("Teleport")]
-    [Tooltip("How far above the new surface to place the player on gravity change")]
-    public float playerStandHeight = 1.0f;
-
-    [Tooltip("Duration of the camera/transition lock after gravity changes")]
-    public float transitionLockTime = 0.6f;
-
-    // ── Private state ─────────────────────────────────────────────────────────
-    private bool      _hasSelection;
+    // State tracking
+    private bool _hasSelection;
+    private bool _isTransitioning;
     private RaycastHit _currentHit;
-    private Vector3   _pendingGravityDirection;
-    private bool      _isTransitioning;
+    private Vector3 _pendingGravityDirection;
 
-    [SerializeField] PlayerInput playerInput;
-    InputAction HologramUP, HologramDOWN, HologramLEFT, HologramRIGHT, ChangeGravity;
+    // Input Actions
+    private InputAction _hologramUp;
+    private InputAction _hologramDown;
+    private InputAction _hologramLeft;
+    private InputAction _hologramRight;
+    private InputAction _changeGravity;
 
-
-    // ── Unity lifecycle ───────────────────────────────────────────────────────
+    #region Unity Lifecycle
 
     private void Start()
     {
-        if (player == null)
-            player = gameObject; // assume script is on the player
-
-        hologramHandler.setActive(false);
-        SetActions();
+        InitializeReferences();
+        InitializeInputs();
     }
-
-
-    void SetActions()
-    {
-
-        HologramUP = playerInput.actions["HologramUP"];
-        HologramDOWN = playerInput.actions["HologramDOWN"];
-        HologramLEFT = playerInput.actions["HologramLEFT"];
-        HologramRIGHT = playerInput.actions["HologramRIGHT"];
-        ChangeGravity = playerInput.actions["ChangeGravity"];
-    }
-
-
 
     private void Update()
     {
-        if (_isTransitioning) return;
+        if (ShouldBlockInput()) return;
+
+        HandleInput();
+    }
+
+    #endregion
+
+    #region Initialization
+
+    private void InitializeReferences()
+    {
+        if (player == null) player = gameObject;
         
-        if(GameManager.instance.isGameOver) return;
-        
-        // Confirm selection
-        if (ChangeGravity.IsPressed() && _hasSelection)
+        if (hologramHandler != null)
+            hologramHandler.setActive(false);
+    }
+
+    private void InitializeInputs()
+    {
+        if (playerInput == null) return;
+
+        _hologramUp    = playerInput.actions["HologramUP"];
+        _hologramDown  = playerInput.actions["HologramDOWN"];
+        _hologramLeft  = playerInput.actions["HologramLEFT"];
+        _hologramRight = playerInput.actions["HologramRIGHT"];
+        _changeGravity = playerInput.actions["ChangeGravity"];
+    }
+
+    #endregion
+
+    #region Logic Execution
+
+    private bool ShouldBlockInput()
+    {
+        return _isTransitioning || (GameManager.instance != null && GameManager.instance.isGameOver);
+    }
+
+    private void HandleInput()
+    {
+        // 1. Check for Gravity Confirmation
+        if (_changeGravity.IsPressed() && _hasSelection)
         {
             StartCoroutine(ApplyGravityChange());
             return;
         }
 
-        if (HologramLEFT.IsPressed())
-            TrySelect(-transform.right);
-
-        else if (HologramRIGHT.IsPressed())
-            TrySelect(transform.right);
-
-        else if (HologramUP.IsPressed())
-            TrySelect(transform.forward);
-
-        else if (HologramDOWN.IsPressed())
-            TrySelect(-transform.forward);
-
+        // 2. Check for Directional Selection
+        if (_hologramLeft.IsPressed())       TrySelect(-transform.right);
+        else if (_hologramRight.IsPressed()) TrySelect(transform.right);
+        else if (_hologramUp.IsPressed())    TrySelect(transform.forward);
+        else if (_hologramDown.IsPressed())  TrySelect(-transform.forward);
     }
-
-    // ── Surface detection ─────────────────────────────────────────────────────
 
     private void TrySelect(Vector3 direction)
     {
-        // Project direction onto the gravity plane so we don't accidentally shoot
-        // straight up or straight down unintentionally.
-        direction = Vector3.ProjectOnPlane(direction, GravityManager.Instance.UpDirection);
+        // Project direction onto gravity plane to maintain orientation consistency
+        Vector3 gravityUp = GravityManager.Instance.UpDirection;
+        direction = Vector3.ProjectOnPlane(direction, gravityUp);
 
+        // Fallback if looking straight up/down
         if (direction.sqrMagnitude < 0.001f)
         {
-            // Direction was parallel to gravity (e.g. player pressed up while looking straight up).
-            // Fall back to the raw direction.
-            direction = GravityManager.Instance.UpDirection;
+            direction = gravityUp;
         }
 
         direction.Normalize();
 
         Vector3 origin = castPoint != null ? castPoint.position : transform.position;
-        Debug.DrawRay(origin, direction * castDistance, Color.yellow, 1f);
-
+        
         if (Physics.Raycast(origin, direction, out RaycastHit hit, castDistance, wallMask))
         {
-            _hasSelection            = true;
-            _currentHit              = hit;
-
-            // Gravity will pull TOWARD this surface (opposite of its outward normal)
-            _pendingGravityDirection = -hit.normal;
-
-            // Show hologram aligned with the surface
-            hologramHandler.setActive(true);
-            hologramHandler.setPosition(hit.normal, hit.point);
+            UpdateSelection(hit);
         }
         else
         {
@@ -127,7 +121,18 @@ public class RotateEnvironment : MonoBehaviour
         }
     }
 
-    // ── Gravity application ───────────────────────────────────────────────────
+    private void UpdateSelection(RaycastHit hit)
+    {
+        _hasSelection = true;
+        _currentHit = hit;
+        _pendingGravityDirection = -hit.normal;
+
+        if (hologramHandler != null)
+        {
+            hologramHandler.setActive(true);
+            hologramHandler.setPosition(hit.normal, hit.point);
+        }
+    }
 
     private IEnumerator ApplyGravityChange()
     {
@@ -142,6 +147,7 @@ public class RotateEnvironment : MonoBehaviour
         }
 
         ClearSelection();
+        
         yield return new WaitForSeconds(transitionLockTime);
         _isTransitioning = false;
     }
@@ -149,10 +155,13 @@ public class RotateEnvironment : MonoBehaviour
     private void ClearSelection()
     {
         _hasSelection = false;
-        hologramHandler.setActive(false);
+        if (hologramHandler != null)
+            hologramHandler.setActive(false);
     }
 
-    // ── Debug visualization ───────────────────────────────────────────────────
+    #endregion
+
+    #region Debug
 
     private void OnDrawGizmos()
     {
@@ -162,4 +171,6 @@ public class RotateEnvironment : MonoBehaviour
         Gizmos.DrawWireSphere(_currentHit.point, 0.2f);
         Gizmos.DrawRay(_currentHit.point, _currentHit.normal * 0.5f);
     }
+
+    #endregion
 }

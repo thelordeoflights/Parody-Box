@@ -1966,6 +1966,7 @@ GameObject:
   m_Component:
   - component: {fileID: 492911033}
   - component: {fileID: 492911032}
+  - component: {fileID: 492911034}
   m_Layer: 0
   m_Name: GravityManager
   m_TagString: Untagged
@@ -2003,6 +2004,20 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &492911034
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 492911031}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1cf4f9ee1711f1e44a6ac3754ab54a1c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  timerValue: 120
+  timeText: {fileID: 2135306364}
 --- !u!1 &508605848
 GameObject:
   m_ObjectHideFlags: 0
@@ -2911,8 +2926,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   gameOverPanel: {fileID: 649428732}
-  gameWinPanel: {fileID: 0}
+  gameWinPanel: {fileID: 662157867}
   virtualCamera: {fileID: 53547604}
+  playerAnimator: {fileID: 6982812148277190592}
+  onGameWin:
+    m_PersistentCalls:
+      m_Calls: []
+  isGameOver: 0
   score: 0
 --- !u!4 &621036018
 Transform:
@@ -4255,13 +4275,13 @@ MonoBehaviour:
   player: {fileID: 4416926083003555584}
   castPoint: {fileID: 1350416733}
   hologramHandler: {fileID: 950793666}
+  playerInput: {fileID: 4416926083003555596}
   wallMask:
     serializedVersion: 2
     m_Bits: 8
   castDistance: 20
   playerStandHeight: 1
   transitionLockTime: 0.6
-  playerInput: {fileID: 4416926083003555596}
 --- !u!114 &950793666
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -8903,7 +8923,7 @@ RectTransform:
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 200, y: 50}
+  m_SizeDelta: {x: 323.4826, y: 143.1944}
   m_Pivot: {x: 0, y: 0}
 --- !u!114 &2135306364
 MonoBehaviour:
@@ -8952,12 +8972,12 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 36
+  m_fontSize: 90.45
   m_fontSizeBase: 36
   m_fontWeight: 400
-  m_enableAutoSizing: 0
+  m_enableAutoSizing: 1
   m_fontSizeMin: 18
-  m_fontSizeMax: 72
+  m_fontSizeMax: 100
   m_fontStyle: 0
   m_HorizontalAlignment: 1
   m_VerticalAlignment: 256
